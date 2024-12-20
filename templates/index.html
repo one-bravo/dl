@@ -23,9 +23,13 @@
             padding: 2rem;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .error-message {
+            background-color: #FEE2E2;
+            border: 1px solid #F87171;
+            color: #991B1B;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
         }
 
         .header {
@@ -176,6 +180,12 @@
             <h1>Bravo's File Transfer</h1>
             <p>Secure file sharing made simple</p>
         </div>
+
+        {% if error %}
+        <div class="error-message">
+            {{ error }}
+        </div>
+        {% endif %}
 
         <div class="status-message" id="statusMessage"></div>
 
