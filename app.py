@@ -1,73 +1,120 @@
-from flask import Flask, request, render_template, send_from_directory, jsonify, url_for
+from flask import Flask, request, render_template, send_from_directory, jsonify, redirect
 import os
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import logging
+import sys
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = app.logger
+# Set up logging to stdout for DigitalOcean
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+))
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.DEBUG)
 
 # Configuration
-UPLOAD_FOLDER = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+try:
+    # For DigitalOcean, use /tmp directory for uploads
+    UPLOAD_FOLDER = '/tmp/uploads'
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.logger.info(f"Using upload folder: {UPLOAD_FOLDER}")
+except Exception as e:
+    app.logger.error(f"Error setting up upload folder: {e}")
+    # Fallback to current directory
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.logger.info(f"Using fallback upload folder: {UPLOAD_FOLDER}")
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 * 1024  # 16GB max-size
 
-# Define URL prefix - important for deployment
-URL_PREFIX = '/dl'
+@app.route('/')
+def root():
+    return redirect('/dl/')
 
-@app.route(URL_PREFIX + '/')
+@app.route('/dl/')
 def index():
     try:
+        app.logger.info("Loading index page")
         files = []
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            try:
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                size = os.path.getsize(file_path)
-                upload_time = datetime.fromtimestamp(os.path.getctime(file_path))
-                files.append({
-                    'name': filename,
-                    'size': size,
-                    'upload_time': upload_time.strftime('%Y-%m-%d %H:%M:%S')
-                })
-            except Exception as e:
-                logger.error(f"Error processing file {filename}: {e}")
-        return render_template('index.html', files=files, url_prefix=URL_PREFIX)
+        
+        # Check if upload directory exists
+        if not os.path.exists(UPLOAD_FOLDER):
+            app.logger.warning("Upload folder doesn't exist, creating it")
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        
+        # Test write permissions
+        test_file = os.path.join(UPLOAD_FOLDER, 'test.txt')
+        try:
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            app.logger.info("Write permission test successful")
+        except Exception as e:
+            app.logger.error(f"Write permission test failed: {e}")
+            return render_template('index.html', 
+                                files=[], 
+                                error="Server configuration error: No write permissions")
+        
+        # List files
+        if os.path.exists(UPLOAD_FOLDER):
+            for filename in os.listdir(UPLOAD_FOLDER):
+                try:
+                    file_path = os.path.join(UPLOAD_FOLDER, filename)
+                    if os.path.isfile(file_path):
+                        size = os.path.getsize(file_path)
+                        upload_time = datetime.fromtimestamp(os.path.getctime(file_path))
+                        files.append({
+                            'name': filename,
+                            'size': size,
+                            'upload_time': upload_time.strftime('%Y-%m-%d %H:%M:%S')
+                        })
+                except Exception as e:
+                    app.logger.error(f"Error processing file {filename}: {e}")
+                    continue
+        
+        app.logger.info(f"Found {len(files)} files")
+        return render_template('index.html', files=files)
+    
     except Exception as e:
-        logger.error(f"Error in index route: {e}")
-        return "Error loading files", 500
+        app.logger.error(f"Error in index route: {str(e)}")
+        return render_template('index.html', 
+                             files=[], 
+                             error=f"Server error: {str(e)}")
 
-@app.route(URL_PREFIX + '/upload', methods=['POST'])
+@app.route('/dl/upload', methods=['POST'])
 def upload_file():
     try:
-        logger.info("Upload request received")
-        logger.info(f"Request path: {request.path}")
-        logger.info(f"Request method: {request.method}")
-        logger.info(f"Files in request: {list(request.files.keys())}")
-
+        app.logger.info("Upload request received")
         if not request.files:
-            logger.error("No files in request")
+            app.logger.warning("No files in request")
             return jsonify({'success': False, 'message': 'No files provided'}), 400
+
+        if not os.path.exists(UPLOAD_FOLDER):
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
         uploaded_files = []
         for key, file in request.files.items():
             if file and file.filename:
                 try:
                     filename = secure_filename(file.filename)
-                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file_path = os.path.join(UPLOAD_FOLDER, filename)
+                    app.logger.info(f"Saving file to {file_path}")
                     file.save(file_path)
                     uploaded_files.append(filename)
-                    logger.info(f"Successfully saved file: {filename}")
+                    app.logger.info(f"Successfully saved file: {filename}")
                 except Exception as e:
-                    logger.error(f"Error saving file {filename}: {e}")
-                    return jsonify({'success': False, 'message': f'Error saving file {filename}: {str(e)}'}), 500
+                    app.logger.error(f"Error saving file {filename}: {e}")
+                    return jsonify({
+                        'success': False,
+                        'message': f'Error saving file {filename}: {str(e)}'
+                    }), 500
 
         return jsonify({
             'success': True,
@@ -76,21 +123,19 @@ def upload_file():
         })
 
     except Exception as e:
-        logger.error(f"Upload error: {e}")
-        return jsonify({'success': False, 'message': f'Server error: {str(e)}'}), 500
+        app.logger.error(f"Upload error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}'
+        }), 500
 
-@app.route(URL_PREFIX + '/download/<filename>')
+@app.route('/dl/download/<filename>')
 def download_file(filename):
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+        return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
     except Exception as e:
-        logger.error(f"Download error for {filename}: {e}")
+        app.logger.error(f"Download error for {filename}: {e}")
         return f"Error downloading file: {str(e)}", 404
-
-# Redirect root to /dl/
-@app.route('/')
-def root():
-    return redirect(URL_PREFIX + '/')
 
 @app.after_request
 def after_request(response):
