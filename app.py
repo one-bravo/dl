@@ -27,11 +27,22 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
-        # Check if a file was actually sent
+        app.logger.info('Upload request received')
+        app.logger.debug(f'Files: {request.files}')
+        app.logger.debug(f'Form: {request.form}')
+
+        # Handle Dropzone's file parameter name
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            for key in request.files:
+                if key.startswith('file'):
+                    file = request.files[key]
+                    break
+            else:
+                app.logger.error('No file found in request')
+                return jsonify({'error': 'No file provided'}), 400
+        else:
+            file = request.files['file']
         
-        file = request.files['file']
         notes = request.form.get('notes', '')
         
         # If user submits without selecting a file
