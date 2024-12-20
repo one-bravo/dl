@@ -201,7 +201,7 @@
                     <h3>{{ file.name }}</h3>
                     <p>Uploaded: {{ file.upload_time }} • Size: {{ '{:.2f}'.format(file.size / 1024 / 1024) }} MB</p>
                 </div>
-                <a href="{{ url_for('download_file', filename=file.name) }}" class="download-btn">
+                <a href="{{ url_prefix }}/download/{{ file.name }}" class="download-btn">
                     Download
                 </a>
             </div>
@@ -263,6 +263,8 @@
                 }
             })
             .catch(error => {
+                console.error('Upload failed:', error);
+                console.log('Upload URL used:', uploadUrl);
                 showStatus('Upload failed: ' + error.message, true);
             })
             .finally(() => {
