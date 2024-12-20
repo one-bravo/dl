@@ -57,13 +57,11 @@
         const uploadForm = new Dropzone("#upload-form", {
             url: "/upload",
             maxFilesize: 16384, // 16GB in MB
-            chunking: true,
-            forceChunking: true,
-            chunkSize: 2000000, // 2MB chunks
-            parallelChunkUploads: true,
+            chunking: false, // Disable chunking for now
             maxFiles: 1,
             autoProcessQueue: true,
             addRemoveLinks: true,
+            paramName: "file", // Ensure file parameter name matches Flask
             dictDefaultMessage: "Drop files here or click to upload",
             
             // Automatically send notes with the file
