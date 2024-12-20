@@ -1,52 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>File Share</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 30px auto;
-            padding: 20px;
-        }
-        .upload-form {
-            border: 2px dashed #ccc;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .files-list {
-            list-style: none;
-            padding: 0;
-        }
-        .files-list li {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .files-list a {
-            color: #0066cc;
-            text-decoration: none;
-        }
-        .files-list a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bravo's File Transfer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="upload-form">
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file">
-            <input type="submit" value="Upload">
-        </form>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Bravo's File Transfer</h1>
+            <p class="text-gray-600">Secure file sharing made simple</p>
+        </div>
+
+        <!-- Upload Zone -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <form id="upload-form" class="dropzone rounded-lg border-2 border-dashed border-gray-300 p-6" action="/upload" method="post">
+                <div class="fallback">
+                    <input name="file" type="file" multiple />
+                </div>
+            </form>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="status-message" class="hidden mb-8 p-4 rounded-lg"></div>
+
+        <!-- Files List -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-semibold mb-4">Available Files</h2>
+            <div class="divide-y divide-gray-200">
+                {% for file in files %}
+                <div class="py-4 flex justify-between items-center">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-medium text-gray-900">{{ file.name }}</h3>
+                        <p class="text-sm text-gray-500">
+                            Uploaded: {{ file.upload_time }} • Size: {{ '{:.2f}'.format(file.size / 1024 / 1024) }} MB
+                        </p>
+                    </div>
+                    <a href="{{ url_for('download_file', filename=file.name) }}" 
+                       class="ml-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Download
+                    </a>
+                </div>
+                {% endfor %}
+                {% if not files %}
+                <p class="py-4 text-gray-500 text-center">No files available</p>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
-    <h3>Available Files:</h3>
-    <ul class="files-list">
-        {% for file in files %}
-        <li>
-            <a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a>
-        </li>
-        {% endfor %}
-    </ul>
+    <script>
+        Dropzone.autoDiscover = false;
+
+        const showStatus = (message, isError = false) => {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.className = `mb-8 p-4 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            statusDiv.classList.remove('hidden');
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        };
+
+        new Dropzone("#upload-form", {
+            url: "/upload",
+            maxFilesize: 16384, // 16GB
+            parallelUploads: 5,
+            maxFiles: null, // unlimited files
+            addRemoveLinks: true,
+            dictDefaultMessage: `
+                <div class="text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="mt-1 text-sm text-gray-600">Drop files here or click to upload</p>
+                </div>
+            `,
+            init: function() {
+                this.on("success", function(file, response) {
+                    showStatus('Files uploaded successfully!');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                });
+                this.on("error", function(file, errorMessage) {
+                    showStatus(errorMessage, true);
+                });
+            }
+        });
+    </script>
 </body>
 </html>
