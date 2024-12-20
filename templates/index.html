@@ -1,157 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Upload Portal</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css" rel="stylesheet">
+    <title>File Share</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+        .upload-form {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .files-list {
+            list-style: none;
+            padding: 0;
+        }
+        .files-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .files-list a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        .files-list a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h1 class="text-2xl font-bold mb-4">File Upload Portal</h1>
-            
-            <!-- Upload Form -->
-            <form id="upload-form" class="dropzone rounded-lg border-2 border-dashed border-gray-300 p-6 mb-6">
-                <div class="fallback">
-                    <input name="file" type="file" />
-                </div>
-            </form>
-            
-            <!-- Notes Section -->
-            <div class="mb-6">
-                <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
-                <textarea id="notes" rows="4" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Add any notes about your file here..."></textarea>
-            </div>
-            
-            <!-- Upload Progress -->
-            <div id="upload-progress" class="hidden mb-6">
-                <div class="w-full bg-gray-200 rounded-full h-2.5">
-                    <div id="progress-bar" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
-                </div>
-                <p id="progress-text" class="mt-2 text-sm text-gray-600">0%</p>
-            </div>
-            
-            <!-- Upload Status Messages -->
-            <div id="status-messages" class="mb-6">
-                <div id="success-message" class="hidden p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg"></div>
-                <div id="error-message" class="hidden p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg"></div>
-            </div>
-        </div>
-        
-        <!-- Recent Uploads -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-            <h2 class="text-xl font-bold mb-4">Recent Uploads</h2>
-            <div id="recent-uploads" class="space-y-4"></div>
-        </div>
+<body>
+    <div class="upload-form">
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file">
+            <input type="submit" value="Upload">
+        </form>
     </div>
 
-    <script>
-        Dropzone.autoDiscover = false;
-        
-        // Initialize Dropzone
-        const uploadForm = new Dropzone("#upload-form", {
-            url: "/upload",
-            maxFilesize: 16384, // 16GB in MB
-            chunking: false, // Disable chunking for now
-            maxFiles: 1,
-            autoProcessQueue: true,
-            addRemoveLinks: true,
-            paramName: "file", // Ensure file parameter name matches Flask
-            dictDefaultMessage: "Drop files here or click to upload",
-            
-            // Automatically send notes with the file
-            params: function() {
-                return {
-                    notes: document.getElementById('notes').value
-                };
-            }
-        });
-        
-        // Upload event handlers
-        uploadForm.on("uploadprogress", function(file, progress) {
-            document.getElementById('upload-progress').classList.remove('hidden');
-            document.getElementById('progress-bar').style.width = progress + '%';
-            document.getElementById('progress-text').textContent = Math.round(progress) + '%';
-        });
-        
-        uploadForm.on("success", function(file, response) {
-            const successMsg = document.getElementById('success-message');
-            successMsg.textContent = 'File uploaded successfully!';
-            successMsg.classList.remove('hidden');
-            
-            // Clear notes
-            document.getElementById('notes').value = '';
-            
-            // Reset progress bar
-            setTimeout(() => {
-                document.getElementById('upload-progress').classList.add('hidden');
-                document.getElementById('progress-bar').style.width = '0%';
-                document.getElementById('progress-text').textContent = '0%';
-            }, 2000);
-            
-            // Refresh recent uploads
-            fetchRecentUploads();
-        });
-        
-        uploadForm.on("error", function(file, errorMessage) {
-            const errorMsg = document.getElementById('error-message');
-            errorMsg.textContent = typeof errorMessage === 'string' ? errorMessage : 'Upload failed. Please try again.';
-            errorMsg.classList.remove('hidden');
-            
-            // Reset progress bar
-            document.getElementById('upload-progress').classList.add('hidden');
-            document.getElementById('progress-bar').style.width = '0%';
-            document.getElementById('progress-text').textContent = '0%';
-        });
-        
-        // Fetch and display recent uploads
-        function fetchRecentUploads() {
-            fetch('/upload-status')
-                .then(response => response.json())
-                .then(data => {
-                    const recentUploadsDiv = document.getElementById('recent-uploads');
-                    recentUploadsDiv.innerHTML = '';
-                    
-                    data.files.forEach(file => {
-                        const fileSize = formatFileSize(file.size);
-                        const fileElement = document.createElement('div');
-                        fileElement.className = 'border rounded-lg p-4';
-                        fileElement.innerHTML = `
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h3 class="font-medium">${file.filename}</h3>
-                                    <p class="text-sm text-gray-500">Size: ${fileSize}</p>
-                                    <p class="text-sm text-gray-500">Uploaded: ${file.upload_time}</p>
-                                </div>
-                            </div>
-                            ${file.notes ? `
-                                <div class="mt-2 p-2 bg-gray-50 rounded">
-                                    <p class="text-sm text-gray-700">${file.notes}</p>
-                                </div>
-                            ` : ''}
-                        `;
-                        recentUploadsDiv.appendChild(fileElement);
-                    });
-                })
-                .catch(error => console.error('Error fetching recent uploads:', error));
-        }
-        
-        // Helper function to format file sizes
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-        
-        // Initial load of recent uploads
-        document.addEventListener('DOMContentLoaded', fetchRecentUploads);
-    </script>
+    <h3>Available Files:</h3>
+    <ul class="files-list">
+        {% for file in files %}
+        <li>
+            <a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a>
+        </li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
