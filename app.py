@@ -29,6 +29,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
 @app.route('/')
+@app.route('/dl')  # Add additional route for /dl path
 def index():
     try:
         files = []
@@ -49,7 +50,9 @@ def index():
         logger.error(f"Error in index route: {e}")
         return "Error loading files", 500
 
+# Ensure upload endpoint works from any path
 @app.route('/upload', methods=['POST'])
+@app.route('/dl/upload', methods=['POST'])
 def upload_file():
     try:
         logger.info("Upload request received")
