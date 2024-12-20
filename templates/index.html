@@ -244,7 +244,8 @@
             updateProgress(0);
             progressBar.style.display = 'block';
 
-            fetch('/upload', {
+            const fullUrl = window.location.href.endsWith('/') ? 'upload' : '/upload';
+            fetch(fullUrl, {
                 method: 'POST',
                 body: formData
             })
