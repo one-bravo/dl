@@ -244,8 +244,10 @@
             updateProgress(0);
             progressBar.style.display = 'block';
 
-            const fullUrl = window.location.href.endsWith('/') ? 'upload' : '/upload';
-            fetch(fullUrl, {
+            // Get the base URL (up to the domain) and append /upload
+            const baseUrl = window.location.origin;
+            const uploadUrl = `${baseUrl}/upload`;
+            fetch(uploadUrl, {
                 method: 'POST',
                 body: formData
             })
